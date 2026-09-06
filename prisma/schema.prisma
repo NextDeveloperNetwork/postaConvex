@@ -1,0 +1,352 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  PENDING
+  ADMIN
+  SELLER
+  COURIER
+  COURIER_TRANSPORT
+  COURIER_DELIVERY
+  OFFICE_STAFF
+  FINANCE_ADMIN
+}
+
+enum ShipmentStatus {
+  CREATED
+  PICKED_UP
+  IN_TRANSIT
+  AT_DESTINATION
+  OUT_FOR_DELIVERY
+  DELIVERED_PENDING_SETTLEMENT
+  CLOSED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  COD_COLLECTED
+  SETTLED
+}
+
+enum PackageType {
+  COD
+  PREPAID
+}
+
+enum DeliveryMode {
+  DOOR_DELIVERY
+  OFFICE_PICKUP
+}
+
+enum BagStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  IN_TRANSIT
+  COMPLETED
+}
+
+enum BagType {
+  DELIVERY
+  TRANSIT
+}
+
+enum OfficeStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum LedgerType {
+  COD_COLLECTION
+  SHIPPING_FEE
+  POSTAL_TARIFF
+  OFFICE_INTEREST_ORIGIN
+  OFFICE_INTEREST_DESTINATION
+  COURIER_FEE
+  SELLER_SETTLEMENT
+  SELLER_REVERSE_PAYOUT
+  ADMIN_PROFIT_TRANSFER
+  OFFICE_COMMISSION_PAYOUT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(PENDING)
+  officeId      String?
+  officeName    String?
+  isDemoUser    Boolean   @default(false)
+  office        Office?   @relation(fields: [officeId], references: [id])
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  createdShipments  Shipment[] @relation("SellerShipments")
+  assignedShipments Shipment[] @relation("CourierShipments")
+  bags              Bag[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Office {
+  id                 String       @id @default(cuid())
+  name               String
+  city               String
+  cashBalance        Float        @default(0.0)
+  earnedCommission   Float        @default(0.0)
+  intakePercentage   Float        @default(20.0)
+  status             OfficeStatus @default(ACTIVE)
+  users              User[]
+  originShipments      Shipment[] @relation("OriginOffice")
+  destinationShipments Shipment[] @relation("DestinationOffice")
+  bags                 Bag[]
+  cities               City[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+model City {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  officeId  String?
+  office    Office?  @relation(fields: [officeId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Shipment {
+  id                 String         @id @default(cuid())
+  trackingNumber     String         @unique
+  barcode            String
+
+  // Sender / seller info (denormalized for quick display)
+  senderName         String
+  senderPhone        String
+  sellerName         String         @default("")
+  sellerId           String?
+
+  // Recipient info
+  recipientName      String
+  recipientPhone     String
+  destinationAddress String
+  destinationCity    String
+
+  // Package & delivery type
+  packageType           PackageType  @default(COD)
+  deliveryMode          DeliveryMode @default(DOOR_DELIVERY)
+  shippingFeePaidBySender Boolean    @default(false)
+
+  // Financial fields
+  codAmount          Float
+  shippingFee        Float          @default(300.0)
+  courierFee         Float          @default(150.0)
+  sellerNet          Float
+
+  // Status
+  status             ShipmentStatus @default(CREATED)
+  paymentStatus      PaymentStatus  @default(UNPAID)
+
+  // Origin office (denormalized names for display)
+  originOfficeId     String
+  originOfficeName   String         @default("")
+  originOffice       Office         @relation("OriginOffice", fields: [originOfficeId], references: [id])
+
+  // Destination office
+  destinationOfficeId   String
+  destinationOfficeName String        @default("")
+  destinationOffice     Office        @relation("DestinationOffice", fields: [destinationOfficeId], references: [id])
+
+  // Relations
+  seller             User?          @relation("SellerShipments", fields: [sellerId], references: [id])
+
+  courierId          String?
+  courierName        String?
+  courier            User?          @relation("CourierShipments", fields: [courierId], references: [id])
+
+  bagShipments       BagShipment[]
+  logs               TrackingLog[]
+  financeLedgers     FinanceLedger[]
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model TrackingLog {
+  id          String         @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  status      ShipmentStatus
+  notes       String?
+  location    String
+  createdBy   String
+  createdAt   DateTime       @default(now())
+}
+
+// Transit bags for grouping shipments
+model Bag {
+  id                   String      @id @default(cuid())
+  courierId            String
+  courier              User        @relation(fields: [courierId], references: [id])
+  officeId             String
+  office               Office      @relation(fields: [officeId], references: [id])
+  courierName          String      @default("")
+  officeName           String      @default("")
+  destinationOfficeId  String?
+  destinationOfficeName String?
+  bagType              BagType     @default(DELIVERY)
+  status               BagStatus   @default(PENDING_APPROVAL)
+  notes                String?
+  approvedAt           DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  shipments  BagShipment[]
+}
+
+// Join table: Bag <-> Shipment (many-to-many)
+model BagShipment {
+  bagId      String
+  bag        Bag      @relation(fields: [bagId], references: [id], onDelete: Cascade)
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@id([bagId, shipmentId])
+}
+
+enum HandoverStatus {
+  PENDING_COURIER_PICKUP
+  TRANSIT_TO_FINANCE
+  RECEIVED_BY_FINANCE
+  DISTRIBUTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+model OfficeCashHandover {
+  id                   String         @id @default(cuid())
+  transferCode         String?        // Unique security transfer code, e.g. TRF-CT-2026-XXXXX
+  officeId             String
+  officeName           String
+  courierId            String?
+  courierName          String?
+  amount               Float
+  shipmentCount        Int            @default(0)
+  status               HandoverStatus @default(PENDING_APPROVAL)
+  submittedBy          String
+  submittedAt          DateTime       @default(now())
+  courierAcceptedAt    DateTime?
+  courierSignature     String?        @db.Text
+  receivedByFinanceAt  DateTime?
+  financeRecipientName String?
+  approvedAt           DateTime?
+  rejectionReason      String?
+  notes                String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+enum PayoutBatchStatus {
+  PENDING_COURIER_PICKUP
+  IN_TRANSIT
+  RECEIVED_BY_OFFICE
+  COMPLETED
+  REJECTED
+}
+
+model PayoutDispatchBatch {
+  id                     String            @id @default(cuid())
+  batchCode              String?           // Unique voucher code, e.g. BATCH-FIN-2026-XXXXX
+  officeId               String
+  officeName             String
+  courierId              String
+  courierName            String
+  totalAmount            Float
+  adminProfitAmount      Float
+  officeCommissionAmount Float
+  status                 PayoutBatchStatus @default(PENDING_COURIER_PICKUP)
+  dispatchedByName       String?
+  courierAcceptedAt      DateTime?
+  courierSignature       String?           @db.Text
+  receivedByName         String?
+  receivedAt             DateTime?
+  rejectionReason        String?
+  itemsJson              String?           @db.Text // Persistent serialized list of packages and seller payout items
+  createdAt              DateTime          @default(now())
+}
+
+model SellerPayoutProof {
+  id               String   @id @default(cuid())
+  voucherNumber    String   @unique // e.g. SLP-2026-00412
+  shipmentId       String   @unique
+  trackingNumber   String
+  sellerId         String
+  sellerName       String
+  amount           Float
+  paymentMethod    String   // CASH | BANK_TRANSFER
+  recipientName    String   // Name of person who collected payout
+  recipientIdCard  String?  // National ID card or passport
+  signatureUrl     String?  @db.Text // Digital signature canvas data URL
+  verificationCode String?  // 6-digit OTP verification PIN
+  bankReference    String?  // Bank reference if electronic wire
+  officeId         String
+  officeName       String
+  processedBy      String   // Office operator staff name
+  notes            String?
+  createdAt        DateTime @default(now())
+}
+
+model FinanceLedger {
+  id            String     @id @default(cuid())
+  shipmentId    String?
+  shipment      Shipment?  @relation(fields: [shipmentId], references: [id])
+  trackingNumber String?
+
+  officeId      String?
+  officeName    String?
+
+  sellerId      String?
+  sellerName    String?
+
+  type          LedgerType
+
+  amount        Float
+  description   String
+  createdAt     DateTime   @default(now())
+}
