@@ -10,7 +10,7 @@ export default function OfficeLayout({
   children: React.ReactNode;
 }) {
   return (
-    <RoleGuard allowedRoles={['OFFICE_STAFF', 'FINANCE_ADMIN']}>
+    <RoleGuard allowedRoles={['OFFICE_STAFF', 'FINANCE_ADMIN', 'ADMIN']}>
       <div className="min-h-screen bg-slate-50 text-slate-950 flex flex-col md:flex-row">
         {/* Office Staff Sidebar & Mobile Topbar */}
         <OfficeSidebar />

@@ -17,7 +17,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
   const { t } = useI18n();
   const router = useRouter();
 
-  const isAllowed = currentUser ? allowedRoles.includes(currentUser.role) : false;
+  const isAllowed = currentUser ? (currentUser.role === 'ADMIN' || allowedRoles.includes(currentUser.role)) : false;
 
   useEffect(() => {
     // Not loaded yet — wait

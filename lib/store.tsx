@@ -175,7 +175,18 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const data = await apiFetch('/api/sync');
       if (data.success) {
-        if (data.users) setUsers(data.users);
+        if (data.users) {
+          setUsers(data.users);
+          setCurrentUserState(prev => {
+            if (!prev) return null;
+            const updated = data.users.find((u: User) => u.id === prev.id || u.email === prev.email);
+            if (updated) {
+              try { localStorage.setItem('posta_current_user', JSON.stringify(updated)); } catch {}
+              return updated;
+            }
+            return prev;
+          });
+        }
         if (data.offices) setOffices(data.offices);
         if (data.cities) setCities(data.cities);
         if (data.shipments) setShipments(data.shipments);

@@ -10,7 +10,7 @@ export default function SellerLayout({
   children: React.ReactNode;
 }) {
   return (
-    <RoleGuard allowedRoles={['SELLER']}>
+    <RoleGuard allowedRoles={['SELLER', 'ADMIN', 'FINANCE_ADMIN']}>
       <div className="min-h-screen bg-slate-50 text-slate-950 flex flex-col md:flex-row">
         {/* Seller Sidebar & Mobile Topbar */}
         <SellerSidebar />

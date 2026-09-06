@@ -98,10 +98,12 @@ export default function OfficeShipmentsPage() {
   const [deletingShipment, setDeletingShipment] = useState<Shipment | null>(null);
   const [barcodeShipment, setBarcodeShipment] = useState<Shipment | null>(null);
 
-  // ── Data (Strictly packages created directly by office staff / walk-in clients) ─────
+  // ── Data (Packages originated at or handled by this office) ─────
   const officeShipments = shipments.filter(s =>
-    s.sellerId === 'walk-in' &&
-    (s.originOfficeId === currentUser.officeId || !currentUser.officeId || currentUser.role === 'FINANCE_ADMIN')
+    s.originOfficeId === currentUser.officeId ||
+    !currentUser.officeId ||
+    currentUser.role === 'FINANCE_ADMIN' ||
+    currentUser.role === 'ADMIN'
   );
 
   const filteredShipments = officeShipments.filter(s => {

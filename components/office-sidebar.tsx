@@ -38,8 +38,13 @@ export const OfficeSidebar: React.FC = () => {
   // Only count ACCEPTED packages in office inventory ready for courier/bag assignment
   const pendingAssignCount = shipments.filter(s => s.status === 'PICKED_UP' && (!currentUser.officeId || s.originOfficeId === currentUser.officeId)).length;
 
-  // Only count packages created directly by office staff / walk-in clients
-  const officeShipmentsCount = shipments.filter(s => s.sellerId === 'walk-in' && (!currentUser.officeId || s.originOfficeId === currentUser.officeId)).length;
+  // Count packages originated at or handled by this office
+  const officeShipmentsCount = shipments.filter(s =>
+    !currentUser.officeId ||
+    s.originOfficeId === currentUser.officeId ||
+    currentUser.role === 'FINANCE_ADMIN' ||
+    currentUser.role === 'ADMIN'
+  ).length;
   const incomingBagsPendingCount = bags.filter(b => (b.status === 'APPROVED' || b.status === 'IN_TRANSIT') && (!currentUser.officeId || b.destinationOfficeId === currentUser.officeId)).length;
   const readyFinalDeliveryCount = shipments.filter(s => s.status === 'AT_DESTINATION' && (!currentUser.officeId || s.destinationOfficeId === currentUser.officeId)).length;
 

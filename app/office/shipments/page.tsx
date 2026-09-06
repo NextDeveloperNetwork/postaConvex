@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import { useI18n } from '@/lib/i18n';
@@ -54,8 +54,10 @@ export default function OfficeShipmentsListPage() {
 
   const officeShipments = shipments.filter(s =>
     s.originOfficeId === currentUser.officeId ||
+    s.destinationOfficeId === currentUser.officeId ||
     !currentUser.officeId ||
-    currentUser.role === 'FINANCE_ADMIN'
+    currentUser.role === 'FINANCE_ADMIN' ||
+    currentUser.role === 'ADMIN'
   );
 
   const filteredShipments = officeShipments.filter(s => {

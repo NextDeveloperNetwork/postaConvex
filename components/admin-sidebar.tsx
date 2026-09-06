@@ -17,7 +17,8 @@ import {
   Menu,
   X,
   MapPin,
-  Award
+  Award,
+  Package
 } from 'lucide-react';
 
 export const AdminSidebar: React.FC = () => {
@@ -33,6 +34,7 @@ export const AdminSidebar: React.FC = () => {
 
   const navItems = [
     { label: 'Perdoruesit & Rolet', href: '/admin', icon: Users },
+    { label: 'Të Gjitha Dërgesat', href: '/office/shipments', icon: Package },
     { label: 'Fitimi i Administratorit', href: '/admin/revenue', icon: Award },
     { label: 'Kerkesat ne Pritje', href: '/admin/pending', icon: Clock, badge: pendingCount },
     { label: 'Zyrat Postare', href: '/admin/offices', icon: Building2 },

@@ -38,7 +38,7 @@ export default function CourierPage() {
 
   // In-transit bags (TRANSIT type already approved, moving)
   const myTransitBags = bags.filter(
-    b => b.courierId === currentUser.id && b.status === 'APPROVED' && b.bagType === 'TRANSIT'
+    b => b.courierId === currentUser.id && (b.status === 'APPROVED' || b.status === 'IN_TRANSIT') && b.bagType === 'TRANSIT'
   );
 
   // Pending bags awaiting courier approval
