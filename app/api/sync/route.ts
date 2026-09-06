@@ -3,39 +3,44 @@ import { prisma } from '@/lib/db';
 
 export async function GET() {
   try {
-    const offices = await prisma.office.findMany({
-      orderBy: { createdAt: 'asc' }
-    });
+    const dbPrisma = prisma as any;
 
-    const users = await prisma.user.findMany({
-      orderBy: { createdAt: 'asc' }
-    });
+    const [
+      offices,
+      users,
+      shipments,
+      ledgers,
+      rawBags,
+      handovers,
+      rawPayoutBatches,
+      payoutProofs,
+      rawCities,
+    ] = await Promise.all([
+      prisma.office.findMany({ orderBy: { createdAt: 'asc' } }),
+      prisma.user.findMany({ orderBy: { createdAt: 'asc' } }),
+      prisma.shipment.findMany({
+        include: { logs: { orderBy: { createdAt: 'asc' } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.financeLedger.findMany({ orderBy: { createdAt: 'desc' } }),
+      prisma.bag.findMany({
+        include: { shipments: { select: { shipmentId: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.officeCashHandover.findMany({ orderBy: { createdAt: 'desc' } }),
+      prisma.payoutDispatchBatch.findMany({ orderBy: { createdAt: 'desc' } }),
+      dbPrisma.sellerPayoutProof
+        ? dbPrisma.sellerPayoutProof.findMany({ orderBy: { createdAt: 'desc' } }).catch(() => [])
+        : Promise.resolve([]),
+      dbPrisma.city
+        ? dbPrisma.city.findMany({
+            include: { office: { select: { id: true, name: true, city: true, status: true } } },
+            orderBy: { name: 'asc' },
+          }).catch(() => [])
+        : Promise.resolve([]),
+    ]);
 
-    const shipments = await prisma.shipment.findMany({
-      include: {
-        logs: { orderBy: { createdAt: 'asc' } }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const ledgers = await prisma.financeLedger.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const rawBags = await prisma.bag.findMany({
-      include: { shipments: { select: { shipmentId: true } } },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const handovers = await prisma.officeCashHandover.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const rawPayoutBatches = await prisma.payoutDispatchBatch.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-
-    const payoutBatches = rawPayoutBatches.map(b => {
+    const payoutBatches = (rawPayoutBatches || []).map((b: any) => {
       let parsedSellerPayouts = [];
       if (b.itemsJson) {
         try {
@@ -50,48 +55,33 @@ export async function GET() {
       };
     });
 
-    let payoutProofs = [];
-    try {
-      payoutProofs = await (prisma as any).sellerPayoutProof.findMany({
-        orderBy: { createdAt: 'desc' }
-      });
-    } catch (pErr) {
-      console.warn('Error fetching payoutProofs in sync:', pErr);
-    }
-
-    // Map DB BagShipment join rows → flat shipmentIds array for client store
-    const bags = rawBags.map(b => ({
+    const bags = (rawBags || []).map((b: any) => ({
       ...b,
-      shipmentIds: b.shipments.map(s => s.shipmentId),
+      shipmentIds: b.shipments ? b.shipments.map((s: any) => s.shipmentId) : [],
     }));
 
-    const dbPrisma = prisma as any;
-    let cities = [];
-    try {
-      cities = await dbPrisma.city.findMany({
-        include: { office: { select: { id: true, name: true, city: true, status: true } } },
-        orderBy: { name: 'asc' }
-      });
-
-      // Seed default Albanian cities if DB is empty
-      if (cities.length === 0) {
+    let cities = rawCities || [];
+    if (cities.length === 0 && dbPrisma.city && offices.length > 0) {
+      try {
         const defaultCityNames = ['Tirane', 'Durres', 'Kavaje', 'Rrogozhine', 'Vore'];
-        for (const cityName of defaultCityNames) {
-          const matchedOffice = offices.find(o => o.city.toLowerCase() === cityName.toLowerCase());
-          await dbPrisma.city.create({
-            data: {
-              name: cityName,
-              officeId: matchedOffice ? matchedOffice.id : null
-            }
-          });
-        }
+        await Promise.all(
+          defaultCityNames.map(cityName => {
+            const matchedOffice = offices.find(o => o.city.toLowerCase() === cityName.toLowerCase());
+            return dbPrisma.city.create({
+              data: {
+                name: cityName,
+                officeId: matchedOffice ? matchedOffice.id : null,
+              },
+            }).catch(() => null);
+          })
+        );
         cities = await dbPrisma.city.findMany({
           include: { office: { select: { id: true, name: true, city: true, status: true } } },
-          orderBy: { name: 'asc' }
+          orderBy: { name: 'asc' },
         });
+      } catch (cErr) {
+        console.warn('City table query fallback:', cErr);
       }
-    } catch (cErr) {
-      console.warn('City table query fallback:', cErr);
     }
 
     return NextResponse.json({
@@ -104,7 +94,7 @@ export async function GET() {
       bags,
       handovers,
       payoutBatches,
-      payoutProofs,
+      payoutProofs: payoutProofs || [],
     });
   } catch (error: any) {
     console.error('Error fetching data from Neon DB:', error);

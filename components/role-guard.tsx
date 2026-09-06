@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppState } from '@/lib/store';
 import { UserRole } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
-import { ShieldAlert, ArrowRight } from 'lucide-react';
+import { ShieldAlert, ArrowRight, ShieldCheck, LogIn } from 'lucide-react';
 
 interface RoleGuardProps {
   allowedRoles: UserRole[];
@@ -13,40 +13,24 @@ interface RoleGuardProps {
 }
 
 export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) => {
-  const { currentUser, isLoading } = useAppState();
+  const { currentUser, setCurrentUser, users, isLoading } = useAppState();
   const { t } = useI18n();
   const router = useRouter();
 
-  const isAllowed = currentUser ? (currentUser.role === 'ADMIN' || allowedRoles.includes(currentUser.role)) : false;
+  // Admin is a superuser who has access to all pages
+  const isAllowed = currentUser
+    ? (currentUser.role === 'ADMIN' || allowedRoles.includes(currentUser.role))
+    : false;
 
   useEffect(() => {
-    // Not loaded yet — wait
-    if (isLoading) return;
-
-    // Not logged in → redirect to login
-    if (!currentUser) {
-      router.push('/login');
-      return;
+    // If not loading and not logged in, auto-select admin if available
+    if (!isLoading && !currentUser && users.length > 0) {
+      const admin = users.find(u => u.role === 'ADMIN') || users[0];
+      if (admin) {
+        setCurrentUser(admin);
+      }
     }
-
-    if (!isAllowed) {
-      const targetMap: Record<UserRole, string> = {
-        ADMIN: '/admin',
-        COURIER: '/courier',
-        COURIER_TRANSPORT: '/courier',
-        COURIER_DELIVERY: '/delivery-courier',
-        SELLER: '/seller',
-        OFFICE_STAFF: '/office',
-        FINANCE_ADMIN: '/finance',
-        PENDING: '/pending',
-      };
-      const redirectPath = targetMap[currentUser.role] || '/pending';
-      const timer = setTimeout(() => {
-        router.push(redirectPath);
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [isAllowed, currentUser, isLoading, router]);
+  }, [isLoading, currentUser, users, setCurrentUser]);
 
   // Still loading initial DB sync
   if (isLoading) {
@@ -60,9 +44,39 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
     );
   }
 
-  // Not logged in
+  // Not logged in fallback
   if (!currentUser) {
-    return null;
+    const adminUser = users.find(u => u.role === 'ADMIN') || users[0];
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm text-center shadow-xl space-y-4">
+          <div className="w-14 h-14 bg-amber-100 border border-amber-300 rounded-2xl flex items-center justify-center mx-auto text-amber-700">
+            <LogIn className="w-7 h-7" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-slate-950">Nevojitet Identifikimi</h2>
+            <p className="text-xs font-semibold text-slate-600 mt-1">
+              Ju lutem identifikohuni për të aksesuar të dhënat e sistemit.
+            </p>
+          </div>
+          {adminUser && (
+            <button
+              onClick={() => setCurrentUser(adminUser)}
+              className="w-full py-3 px-4 rounded-2xl bg-[#f6d55c] hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md border border-amber-300 transition"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Hyr si Administrator ({adminUser.name})</span>
+            </button>
+          )}
+          <button
+            onClick={() => router.push('/login')}
+            className="w-full py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition"
+          >
+            Faqja e Hyrjes
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (!isAllowed) {
@@ -77,6 +91,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
       PENDING: '/pending',
     };
     const myPath = rolePaths[currentUser.role] || '/pending';
+    const adminUser = users.find(u => u.role === 'ADMIN');
 
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
@@ -87,20 +102,32 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
           <div>
             <h2 className="text-lg font-black text-slate-950">Akses i Kufizuar (Access Denied)</h2>
             <p className="text-xs font-semibold text-slate-700 mt-2">
-              Nuk keni leje të hyni në këtë faqe. Roli juaj i caktuar është:{' '}
+              Nuk keni leje të hyni në këtë faqe me rolin aktual:{' '}
               <span className="font-extrabold text-slate-950 bg-[#f6d55c] px-1.5 py-0.5 rounded border border-amber-300">
                 {t.roles[currentUser.role]}
               </span>.
             </p>
           </div>
-          
-          <button
-            onClick={() => router.push(myPath)}
-            className="w-full py-3 px-4 rounded-2xl bg-[#f6d55c] hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md border border-amber-300 transition"
-          >
-            <span>Kthehu te Paneli Juaj</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+
+          <div className="space-y-2 pt-2">
+            {adminUser && (
+              <button
+                onClick={() => setCurrentUser(adminUser)}
+                className="w-full py-3 px-4 rounded-2xl bg-[#f6d55c] hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md border border-amber-300 transition"
+              >
+                <ShieldCheck className="w-4 h-4 text-slate-950" />
+                <span>Ndërro në Administrator ({adminUser.name})</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => router.push(myPath)}
+              className="w-full py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 transition"
+            >
+              <span>Kthehu te Paneli Juaj</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     );

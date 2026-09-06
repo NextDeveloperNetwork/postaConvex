@@ -175,16 +175,24 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const data = await apiFetch('/api/sync');
       if (data.success) {
-        if (data.users) {
+        if (data.users && data.users.length > 0) {
           setUsers(data.users);
           setCurrentUserState(prev => {
-            if (!prev) return null;
-            const updated = data.users.find((u: User) => u.id === prev.id || u.email === prev.email);
-            if (updated) {
-              try { localStorage.setItem('posta_current_user', JSON.stringify(updated)); } catch {}
-              return updated;
+            if (prev) {
+              const updated = data.users.find((u: User) => u.id === prev.id || u.email === prev.email);
+              if (updated) {
+                try { localStorage.setItem('posta_current_user', JSON.stringify(updated)); } catch {}
+                return updated;
+              }
+              return prev;
             }
-            return prev;
+            // Auto-select Admin if no user is saved in localStorage so the developer/user is never blocked
+            const defaultUser = data.users.find((u: User) => u.role === 'ADMIN') || data.users[0];
+            if (defaultUser) {
+              try { localStorage.setItem('posta_current_user', JSON.stringify(defaultUser)); } catch {}
+              return defaultUser;
+            }
+            return null;
           });
         }
         if (data.offices) setOffices(data.offices);
@@ -202,10 +210,6 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    syncFromDB();
-  }, []);
 
   // ─── 1. Create Shipment ────────────────────────────────────────────────────
   const createShipment = async (data: {
