@@ -1,22 +1,12 @@
-// Native require bypasses Webpack bundle cache
-const getPrismaConstructor = () => {
-  try {
-    const req = eval('require');
-    return req('@prisma/client').PrismaClient;
-  } catch (e) {
-    return require('@prisma/client').PrismaClient;
-  }
-};
+import { PrismaClient } from '@prisma/client';
 
-const PrismaClientClass = getPrismaConstructor();
-
-const globalForPrisma = global as unknown as { prisma?: any };
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export const prisma =
   globalForPrisma.prisma ||
-  (globalForPrisma.prisma = new PrismaClientClass({
+  new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  }));
+  });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
