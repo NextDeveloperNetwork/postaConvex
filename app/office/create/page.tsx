@@ -6,14 +6,6 @@ import { useAuthenticatedState } from '@/lib/store';
 import { Shipment } from '@/lib/types';
 import { ALBANIAN_CITIES } from '@/lib/constants';
 
-function useCities() {
-  if (typeof window === 'undefined') return ALBANIAN_CITIES;
-  try {
-    const saved = localStorage.getItem('posta_cities');
-    if (saved) return JSON.parse(saved) as string[];
-  } catch {}
-  return ALBANIAN_CITIES;
-}
 import { WorkflowTracker } from '@/components/workflow-tracker';
 import {
   PackagePlus,
@@ -48,9 +40,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function OfficeShipmentsPage() {
+
   const { t, formatALL } = useI18n();
-  const { offices, users, createShipment, cancelShipment, deleteShipment, shipments, currentUser } = useAuthenticatedState();
-  const cities = useCities();
+  const { offices, users, createShipment, cancelShipment, deleteShipment, shipments, cities: dbCities, currentUser } = useAuthenticatedState();
+  const cities = dbCities && dbCities.length > 0 ? dbCities.map(c => c.name) : ALBANIAN_CITIES;
+
 
   // ── Dialog state ──────────────────────────────────────────
   const [showDialog, setShowDialog] = useState(false);

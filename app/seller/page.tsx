@@ -5,21 +5,14 @@ import { useI18n } from '@/lib/i18n';
 import { useAuthenticatedState } from '@/lib/store';
 import { Shipment } from '@/lib/types';
 import { ALBANIAN_CITIES } from '@/lib/constants';
-
-function useCities() {
-  if (typeof window === 'undefined') return ALBANIAN_CITIES;
-  try {
-    const saved = localStorage.getItem('posta_cities');
-    if (saved) return JSON.parse(saved) as string[];
-  } catch {}
-  return ALBANIAN_CITIES;
-}
 import { Package, PlusCircle, Printer, Store, DollarSign, XCircle, Trash2, AlertTriangle, CreditCard } from 'lucide-react';
 
 export default function SellerDashboardPage() {
-  const { shipments, createShipment, cancelShipment, deleteShipment, offices, currentUser } = useAuthenticatedState();
+
+  const { shipments, createShipment, cancelShipment, deleteShipment, offices, cities: dbCities, currentUser } = useAuthenticatedState();
   const { t, formatALL } = useI18n();
-  const cities = useCities();
+  const cities = dbCities && dbCities.length > 0 ? dbCities.map(c => c.name) : ALBANIAN_CITIES;
+
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [packageType, setPackageType] = useState<'COD' | 'PREPAID'>('COD');

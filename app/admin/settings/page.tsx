@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import Link from 'next/link';
@@ -8,34 +8,23 @@ import { Settings, Save, CheckCircle2, DollarSign, Globe, Shield, Building2, Arr
 
 export default function AdminSettingsPage() {
   const { t } = useI18n();
-  const { offices } = useAuthenticatedState();
+  const { syncFromDB } = useAuthenticatedState();
 
-  // Configurable Fee Parameters
-  const [shippingFee, setShippingFee] = useState<number>(300);
-  const [deliveryOfficeFee, setDeliveryOfficeFee] = useState<number>(100);
-  
-  const [defaultCurrency, setDefaultCurrency] = useState('ALL');
-  const [defaultLanguage, setDefaultLanguage] = useState('sq');
-  const [defaultOfficeId, setDefaultOfficeId] = useState(offices[0]?.id || 'off-1');
-  const [requireApproval, setRequireApproval] = useState(true);
-  const [savedSuccess, setSavedSuccess] = useState(false);
-  const [resetDone, setResetDone] = useState(false);
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3500);
+  const handleResetData = async () => {
+    if (!window.confirm('KUJDES! Kjo do të fshijë të gjitha dërgesat, thasët, ledgerët dhe arkat nga Baza e Të Dhënave. Përdoruesit dhe zyrat do të mbeten. Vazhdo?')) return;
+    try {
+      const res = await fetch('/api/dev/clear');
+      const data = await res.json();
+      if (data.success) {
+        await syncFromDB();
+        setResetDone(true);
+        setTimeout(() => setResetDone(false), 3000);
+      }
+    } catch (err) {
+      console.error('Reset error:', err);
+    }
   };
 
-  const handleResetData = () => {
-    if (!window.confirm('KUJDES! Kjo do te fshije te gjitha dergesat, thaset, ledgerat dhe arkat. Perdoruesit dhe zyrat do te mbeten. Vazhdo?')) return;
-    localStorage.removeItem('posta_shipments');
-    localStorage.removeItem('posta_offices');
-    localStorage.removeItem('posta_ledgers');
-    localStorage.removeItem('posta_bags');
-    setResetDone(true);
-    setTimeout(() => window.location.reload(), 1500);
-  };
 
   return (
     <main className="w-full space-y-6">
